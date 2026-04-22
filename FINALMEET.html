@@ -1,0 +1,635 @@
+```html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JKT48 Video Call Meet | Official</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --jkt-red: #e10000;
+            --jkt-red-glow: rgba(225, 0, 0, 0.4);
+        }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .video-bg {
+            position: fixed;
+            top: 50%; left: 50%;
+            min-width: 100%; min-height: 100%;
+            width: auto; height: auto;
+            z-index: -100;
+            transform: translateX(-50%) translateY(-50%);
+            filter: brightness(0.4) contrast(1.2);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.5) 100%);
+            z-index: -90;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar-btn.active {
+            background: var(--jkt-red);
+            box-shadow: 0 0 20px var(--jkt-red-glow);
+        }
+
+        .animate-view { animation: slideIn 0.5s forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hidden { display: none !important; }
+
+        /* Video Call Elements */
+        #user-camera, #admin-monitor-fans {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 24px;
+            transform: scaleX(-1);
+        }
+        .member-frame {
+            background: linear-gradient(45deg, #111, #222);
+            position: relative;
+            overflow: hidden;
+        }
+        .admin-media-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.8);
+        }
+        .monitor-window {
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .signal-bar {
+            width: 3px;
+            background: #22c55e;
+            border-radius: 2px;
+            margin: 0 1px;
+        }
+
+        /* Sound Pulse Animation */
+        .sound-wave {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            height: 20px;
+        }
+        .wave-bar {
+            width: 2px;
+            height: 100%;
+            background: #e10000;
+            animation: pulse-wave 1s ease-in-out infinite;
+        }
+        @keyframes pulse-wave {
+            0%, 100% { height: 20%; }
+            50% { height: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <video autoplay muted loop playsinline class="video-bg">
+        <source src="FIGHT.mp4" type="video/mp4">
+    </video>
+    <div class="overlay"></div>
+
+    <div class="flex h-screen p-4 md:p-8 gap-6 relative z-10">
+        
+        <!-- SIDEBAR -->
+        <aside class="glass w-20 md:w-72 rounded-[40px] flex flex-col p-6 transition-all duration-500">
+            <div class="mb-12 px-2">
+                <img src="JKTLOGO.jpg" alt="Logo" class="w-12 brightness-0 invert">
+            </div>
+
+            <nav class="flex-1 space-y-4">
+                <button onclick="switchView('home')" id="btn-home" class="sidebar-btn active w-full flex items-center gap-4 p-4 rounded-2xl">
+                    <i class="fas fa-home"></i><span class="hidden md:block font-bold text-xs">BERANDA</span>
+                </button>
+                <button onclick="switchView('buy')" id="btn-buy" class="sidebar-btn w-full flex items-center gap-4 p-4 rounded-2xl">
+                    <i class="fas fa-shopping-cart"></i><span class="hidden md:block font-bold text-xs">BELI</span>
+                </button>
+                <button onclick="switchView('vouchers')" id="btn-vouchers" class="sidebar-btn w-full flex items-center gap-4 p-4 rounded-2xl">
+                    <i class="fas fa-ticket-alt"></i><span class="hidden md:block font-bold text-xs">VOUCHER</span>
+                </button>
+                <button onclick="switchView('vc')" id="btn-vc" class="sidebar-btn w-full flex items-center gap-4 p-4 rounded-2xl">
+                    <i class="fas fa-video"></i><span class="hidden md:block font-bold text-xs">VIDEO CALL</span>
+                </button>
+            </nav>
+
+            <div class="mt-auto bg-black/30 p-5 rounded-3xl border border-white/5">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] text-gray-400">ONLINE</span>
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
+                </div>
+                <div class="text-2xl font-black" id="live-users">1.482</div>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Fans</p>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 overflow-y-auto px-4 md:px-10 py-10">
+            
+            <!-- HOME -->
+            <section id="view-home" class="h-full flex flex-col justify-center animate-view">
+                <h1 class="text-6xl md:text-8xl font-black italic tracking-tighter leading-[0.9]">
+                    VIDEO CALL<br><span class="text-red-600 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]">MEET</span> JKT48
+                </h1>
+                <p class="mt-8 text-xl text-gray-400 tracking-[0.3em] font-light uppercase">Momen Spesial Hanya Untukmu.</p>
+                <button onclick="switchView('buy')" class="mt-12 w-fit px-10 py-5 bg-red-600 rounded-full font-black tracking-widest hover:bg-red-500 transition-all shadow-2xl">
+                    BELI SEKARANG
+                </button>
+            </section>
+
+            <!-- BUY -->
+            <section id="view-buy" class="hidden animate-view">
+                <div class="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
+                    <div>
+                        <h2 class="text-5xl font-black italic uppercase leading-none">Member List</h2>
+                        <div class="text-red-500 font-bold mt-2 text-xs uppercase tracking-widest">RESET STATUS: <span id="global-timer">50:00</span></div>
+                    </div>
+                    <input type="text" id="search-input" oninput="renderMembers()" placeholder="Cari member..." class="glass w-full md:w-80 rounded-2xl py-4 px-6 focus:outline-none focus:border-red-500">
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-4" id="member-grid"></div>
+            </section>
+
+            <!-- VOUCHERS -->
+            <section id="view-vouchers" class="hidden animate-view">
+                <h2 class="text-5xl font-black italic mb-10 uppercase">Voucher Saya</h2>
+                <div id="voucher-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                <div id="empty-voucher" class="text-center py-20 glass rounded-[40px] hidden">
+                    <p class="text-gray-500">Belum ada voucher tersimpan.</p>
+                </div>
+            </section>
+
+            <!-- VIDEO CALL (ENTRY) -->
+            <section id="view-vc" class="hidden animate-view flex flex-col items-center justify-center h-full">
+                <div class="glass p-12 rounded-[40px] w-full max-w-lg text-center">
+                    <i class="fas fa-video text-5xl text-red-600 mb-6"></i>
+                    <h2 class="text-3xl font-black mb-4 uppercase">Masuk Video Call</h2>
+                    <p class="text-gray-400 mb-8">Masukkan kode voucher atau kode akses admin untuk memulai sesi.</p>
+                    <input type="password" id="vc-code-input" placeholder="Masukkan Kode Voucher..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-center text-xl font-bold tracking-widest focus:outline-none focus:border-red-600 mb-6">
+                    <button onclick="validateVCCode()" class="w-full bg-red-600 py-5 rounded-2xl font-black tracking-widest hover:bg-red-500 transition-all">
+                        MULAI SEKARANG
+                    </button>
+                </div>
+            </section>
+
+            <!-- VC INTERFACE (USER) -->
+            <section id="view-vc-active" class="hidden h-full flex flex-col gap-6 animate-view relative">
+                <div class="absolute top-8 left-8 right-8 z-[60] flex justify-between items-start pointer-events-none">
+                    <div class="flex items-center gap-4 bg-black/40 backdrop-blur-md p-3 px-5 rounded-full border border-white/10">
+                        <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-black text-sm" id="vc-member-initial">?</div>
+                        <div>
+                            <h4 class="text-xs font-black uppercase tracking-widest" id="vc-member-display-name">MEMBER</h4>
+                            <div class="flex items-center gap-1 mt-1">
+                                <div class="signal-bar h-1"></div>
+                                <div class="signal-bar h-2"></div>
+                                <div class="signal-bar h-3"></div>
+                                <div class="signal-bar h-4"></div>
+                                <span class="text-[8px] font-bold text-green-500 ml-1">4G / EXCELLENT</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-red-600 text-white p-3 px-6 rounded-full font-black text-2xl shadow-2xl flex flex-col items-center">
+                        <span class="text-[8px] uppercase tracking-tighter mb-0.5 opacity-80">Sisa Waktu</span>
+                        <div id="vc-timer">50</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[75vh] mt-10">
+                    <div class="glass rounded-[40px] member-frame flex flex-col items-center justify-center">
+                        <div id="vc-status-msg" class="text-center p-8">
+                            <div class="animate-spin text-4xl text-red-600 mb-4"><i class="fas fa-circle-notch"></i></div>
+                            <h3 id="status-main-text" class="text-2xl font-black uppercase">Menghubungkan...</h3>
+                            <p id="status-sub-text" class="text-gray-400">Harap tunggu di antrean.</p>
+                        </div>
+                        <div id="member-stream" class="hidden w-full h-full relative">
+                            <div class="absolute inset-0 flex items-center justify-center bg-gray-900">
+                                <div class="text-center">
+                                    <div class="w-40 h-40 bg-red-600 rounded-full flex items-center justify-center text-6xl font-black mx-auto mb-4" id="member-avatar">M</div>
+                                    <h4 class="text-3xl font-bold" id="active-member-name">Member Name</h4>
+                                    <span class="text-green-500 font-black animate-pulse flex items-center justify-center gap-2 mt-2">
+                                        <i class="fas fa-circle text-[10px]"></i> LIVE
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- Media and Sound Overlays -->
+                            <div id="user-media-view" class="admin-media-overlay hidden"></div>
+                            <div id="user-sound-view" class="hidden absolute top-4 right-4 z-[70] bg-red-600/80 p-2 rounded-xl flex items-center gap-2">
+                                <i class="fas fa-music text-[10px]"></i>
+                                <div class="sound-wave">
+                                    <div class="wave-bar" style="animation-delay: 0.1s"></div>
+                                    <div class="wave-bar" style="animation-delay: 0.3s"></div>
+                                    <div class="wave-bar" style="animation-delay: 0.2s"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass rounded-[40px] overflow-hidden relative border-2 border-white/5">
+                        <video id="user-camera" autoplay playsinline muted></video>
+                        <div class="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold border border-white/10 uppercase tracking-widest">
+                            ANDA (FANS)
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-center -mt-6">
+                    <button onclick="endVCSession()" class="bg-red-600 w-24 h-24 rounded-full text-3xl hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(225,0,0,0.4)] flex items-center justify-center group">
+                        <i class="fas fa-phone-slash group-hover:rotate-12 transition-transform"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ADMIN PANEL -->
+            <section id="view-admin" class="hidden animate-view h-full">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-4xl font-black italic uppercase leading-none">Admin Monitoring<br><span class="text-xs text-red-500 font-bold tracking-widest">REAL-TIME SURVEILLANCE</span></h2>
+                    <button onclick="switchView('home')" class="bg-white/10 px-6 py-2 rounded-full text-xs font-bold hover:bg-red-600 transition-all">LOGOUT</button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="glass p-6 rounded-[40px] flex flex-col gap-6">
+                        <div>
+                            <h3 class="font-bold mb-4 uppercase text-red-500 text-[10px] tracking-widest">Member Terjadwal</h3>
+                            <div class="space-y-2 max-h-[25vh] overflow-y-auto pr-2" id="admin-session-list">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-bold mb-4 uppercase text-red-500 text-[10px] tracking-widest">Asset Injector</h3>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center cursor-pointer hover:bg-white/10 transition-all">
+                                    <i class="fas fa-image mb-2 block text-xl"></i><div class="text-[8px] font-black uppercase">FOTO</div>
+                                    <input type="file" id="inject-img" accept="image/*" class="hidden" onchange="adminUploadMedia(this, 'image')">
+                                </label>
+                                <label class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center cursor-pointer hover:bg-white/10 transition-all">
+                                    <i class="fas fa-play mb-2 block text-xl"></i><div class="text-[8px] font-black uppercase">VIDEO</div>
+                                    <input type="file" id="inject-vid" accept="video/*" class="hidden" onchange="adminUploadMedia(this, 'video')">
+                                </label>
+                                <label class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center cursor-pointer hover:bg-white/10 transition-all col-span-2">
+                                    <i class="fas fa-music mb-2 block text-xl"></i><div class="text-[8px] font-black uppercase">INJECT SOUND</div>
+                                    <input type="file" id="inject-aud" accept="audio/*" class="hidden" onchange="adminUploadMedia(this, 'audio')">
+                                </label>
+                            </div>
+                            <button onclick="clearAdminMedia()" class="w-full mt-4 bg-red-600/20 border border-red-600/30 py-3 rounded-2xl text-[9px] font-black uppercase hover:bg-red-600 transition-all">Reset Semua Media</button>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-3 space-y-6">
+                        <div class="glass p-6 rounded-[40px] bg-red-900/10 border-red-600/20 mb-4 flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-black" id="admin-target-initial">?</div>
+                                <div>
+                                    <h4 class="text-sm font-black uppercase" id="admin-target-name">Pilih Sesi Member</h4>
+                                    <p class="text-[10px] text-gray-500 uppercase tracking-widest" id="admin-target-status">Siap Memantau</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-6 text-right">
+                                <div>
+                                    <div class="text-xs font-black text-green-500" id="monitor-count">1.482</div>
+                                    <div class="text-[8px] text-gray-500 font-bold uppercase">Viewers</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="glass p-4 rounded-[40px]">
+                                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 px-2">Monitoring Media</h3>
+                                <div class="monitor-window relative flex items-center justify-center bg-black/40" id="admin-monitor-member">
+                                    <p class="text-[9px] text-gray-600 uppercase italic font-bold text-center p-4">Pratinjau media yang di-inject akan muncul di sini</p>
+                                </div>
+                            </div>
+
+                            <div class="glass p-4 rounded-[40px]">
+                                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 px-2">Kamera Fans</h3>
+                                <div class="monitor-window">
+                                    <video id="admin-monitor-fans" autoplay playsinline muted></video>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass p-4 rounded-3xl bg-black/40 h-24 overflow-y-auto font-mono text-[10px] text-gray-500" id="admin-logs">
+                            <p>> [SYSTEM] Secure surveillance protocol active...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- POPUP MODAL -->
+    <div id="popup-buy" class="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="glass w-full max-w-md rounded-[40px] overflow-hidden p-10 relative">
+            <button onclick="closePopup()" class="absolute top-6 right-6 text-gray-500"><i class="fas fa-times"></i></button>
+            <div class="w-20 h-20 bg-red-600 rounded-3xl flex items-center justify-center text-3xl font-black mb-6" id="p-initial">M</div>
+            <h3 class="text-3xl font-black mb-2 uppercase" id="p-name">MEMBER</h3>
+            <p class="text-gray-400 text-sm mb-6">Siapkan momen Video Call mu!</p>
+            <div class="bg-white/5 p-5 rounded-3xl border border-white/10 flex justify-between items-center mb-6">
+                <code class="text-xl font-bold text-red-500" id="p-code">JKT48-CODE</code>
+                <button onclick="copyToClipboard(document.getElementById('p-code').innerText)"><i class="fas fa-copy"></i></button>
+            </div>
+            <div id="voucher-menu" class="hidden">
+                <div class="bg-red-600 p-6 rounded-3xl">
+                    <p class="text-[10px] font-bold mb-2">BONUS VOUCHER</p>
+                    <div class="text-2xl font-black mb-4">VC-PASS-48</div>
+                    <button class="w-full bg-white text-black py-3 rounded-xl font-bold text-sm uppercase">Tersimpan Otomatis</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MEMBER_NAMES = ["Adel", "Amanda", "Anya", "Callie", "Chika", "Christy", "Daisy", "Eli", "Erine", "Feni", "Fiony", "Flora", "Freya", "Gita", "Gracie", "Greesel", "Indah", "Indira", "Irin", "Jessi", "Kathrina", "Lulu", "Lyn", "Marsha", "Muthe", "Oniel", "Olla", "Raisha", "Shani", "Gracia", "Zee", "Ashel", "Michie", "Elie", "Jeane", "Aralie", "Delynn", "Gendis", "Lana", "Shasa", "Cynthia", "Anindya", "Chelsea", "Danessa", "Desy", "Aulia", "Nala"];
+        
+        let members = [];
+        let timerSeconds = 3000;
+        let myVouchers = JSON.parse(localStorage.getItem('jkt48_vouchers')) || [];
+        let activeVCMember = null;
+        let userMediaStream = null;
+        let selectedAdminTarget = null;
+        let vcCountdown = 50;
+        let vcInterval = null;
+        let activeAudio = null;
+
+        function logAdmin(msg) {
+            const logs = document.getElementById('admin-logs');
+            if(logs) {
+                const p = document.createElement('p');
+                p.innerText = `> [${new Date().toLocaleTimeString()}] ${msg}`;
+                logs.prepend(p);
+            }
+        }
+
+        function switchView(viewId) {
+            const views = ['home', 'buy', 'vouchers', 'vc', 'vc-active', 'admin'];
+            views.forEach(v => {
+                document.getElementById(`view-${v}`)?.classList.add('hidden');
+                document.getElementById(`btn-${v}`)?.classList.remove('active');
+            });
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            document.getElementById(`btn-${viewId}`)?.classList.add('active');
+            if(viewId === 'vouchers') renderVouchers();
+            if(viewId === 'buy') renderMembers();
+            if(viewId === 'admin') renderAdminSessionList();
+        }
+
+        function renderMembers() {
+            const grid = document.getElementById('member-grid');
+            const term = document.getElementById('search-input').value.toLowerCase();
+            grid.innerHTML = '';
+            members.forEach(m => {
+                if(m.name.toLowerCase().includes(term) || m.status.toLowerCase().includes(term)) {
+                    const card = document.createElement('div');
+                    card.className = 'glass p-6 rounded-3xl text-center cursor-pointer hover:border-red-600 transition-all';
+                    card.onclick = () => openPopup(m);
+                    card.innerHTML = `<div class="w-12 h-12 bg-red-600 rounded-2xl mx-auto mb-3 flex items-center justify-center font-black">${m.name[0]}</div><div class="font-bold text-xs mb-1">${m.name}</div><span class="text-[8px] px-2 py-1 rounded-full ${m.status==='Terjadwal'?'bg-green-500/20 text-green-400':'bg-yellow-500/20 text-yellow-400'}">${m.status}</span>`;
+                    grid.appendChild(card);
+                }
+            });
+        }
+
+        function renderAdminSessionList() {
+            const list = document.getElementById('admin-session-list');
+            list.innerHTML = '';
+            const terjadwal = members.filter(m => m.status === 'Terjadwal');
+            terjadwal.forEach(m => {
+                const el = document.createElement('div');
+                el.className = `p-3 rounded-2xl cursor-pointer transition-all border border-white/5 flex items-center gap-3 ${selectedAdminTarget?.id === m.id ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`;
+                el.onclick = () => selectAdminTarget(m);
+                el.innerHTML = `<div class="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center font-black text-xs">${m.name[0]}</div><div class="text-[10px] font-bold uppercase">${m.name}</div><div class="ml-auto w-1.5 h-1.5 bg-green-500 rounded-full"></div>`;
+                list.appendChild(el);
+            });
+        }
+
+        function selectAdminTarget(m) {
+            selectedAdminTarget = m;
+            document.getElementById('admin-target-initial').innerText = m.name[0];
+            document.getElementById('admin-target-name').innerText = m.name;
+            document.getElementById('admin-target-status').innerText = 'LIVE MONITORING ACTIVE';
+            logAdmin(`Switched focus to ${m.name} session.`);
+            renderAdminSessionList();
+        }
+
+        function openPopup(m) {
+            document.getElementById('popup-buy').classList.remove('hidden');
+            document.getElementById('p-name').innerText = m.name;
+            document.getElementById('p-initial').innerText = m.name[0];
+            document.getElementById('p-code').innerText = `VC-${m.name.toUpperCase()}-${Math.floor(1000+Math.random()*9000)}`;
+            const v = { id: Date.now(), memberName: m.name, code: 'VC-PASS-48', date: '20 April 2024' };
+            if(!myVouchers.some(x => x.memberName === m.name)) {
+                myVouchers.push(v);
+                localStorage.setItem('jkt48_vouchers', JSON.stringify(myVouchers));
+            }
+            setTimeout(() => document.getElementById('voucher-menu').classList.remove('hidden'), 10000);
+        }
+
+        function closePopup() { document.getElementById('popup-buy').classList.add('hidden'); }
+
+        function renderVouchers() {
+            const list = document.getElementById('voucher-list');
+            const empty = document.getElementById('empty-voucher');
+            list.innerHTML = '';
+            if(myVouchers.length === 0) empty.classList.remove('hidden');
+            else {
+                empty.classList.add('hidden');
+                myVouchers.forEach(v => {
+                    const el = document.createElement('div');
+                    el.className = 'glass p-6 rounded-3xl border-l-4 border-red-600';
+                    el.innerHTML = `<div class="flex justify-between"><div><h4 class="font-bold">${v.memberName}</h4><p class="text-[10px] text-gray-400">Video Call Pass</p></div><div class="text-red-500 font-bold">VC48</div></div><div class="mt-4 bg-black/40 p-3 rounded-xl flex justify-between font-mono text-sm"><code>${v.code}</code><i class="fas fa-copy cursor-pointer" onclick="copyToClipboard('${v.code}')"></i></div>`;
+                    list.appendChild(el);
+                });
+            }
+        }
+
+        async function validateVCCode() {
+            const code = document.getElementById('vc-code-input').value;
+            if(code === 'admin0608') {
+                logAdmin('Admin logged in.');
+                switchView('admin');
+                if(userMediaStream) document.getElementById('admin-monitor-fans').srcObject = userMediaStream;
+                return;
+            }
+            const validVoucher = myVouchers.find(v => v.code === code);
+            if(validVoucher) {
+                activeVCMember = validVoucher.memberName;
+                document.getElementById('active-member-name').innerText = activeVCMember;
+                document.getElementById('member-avatar').innerText = activeVCMember[0];
+                document.getElementById('vc-member-display-name').innerText = activeVCMember;
+                document.getElementById('vc-member-initial').innerText = activeVCMember[0];
+                startVCFlow();
+            } else { alert('KODE VOUCHER TIDAK VALID!'); }
+        }
+
+        function startVCFlow() {
+            switchView('vc-active');
+            const statusMain = document.getElementById('status-main-text');
+            const statusSub = document.getElementById('status-sub-text');
+            statusMain.innerText = "WAITING LIST";
+            let timeLeft = 3;
+            const waitInterval = setInterval(() => {
+                statusSub.innerText = `Harap tunggu: ${timeLeft} detik...`;
+                timeLeft--;
+                if(timeLeft < 0) { clearInterval(waitInterval); startPreparation(); }
+            }, 1000);
+        }
+
+        function startPreparation() {
+            const statusMain = document.getElementById('status-main-text');
+            const statusSub = document.getElementById('status-sub-text');
+            statusMain.innerText = "PERSIAPAN";
+            let prepTime = 2;
+            const prepInterval = setInterval(() => {
+                statusSub.innerText = `Kamera aktif dalam ${prepTime}...`;
+                prepTime--;
+                if(prepTime < 0) { clearInterval(prepInterval); activateCamera(); }
+            }, 1000);
+        }
+
+        async function activateCamera() {
+            try {
+                userMediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('user-camera').srcObject = userMediaStream;
+                document.getElementById('vc-status-msg').classList.add('hidden');
+                document.getElementById('member-stream').classList.remove('hidden');
+                const adminMonitor = document.getElementById('admin-monitor-fans');
+                if(adminMonitor) adminMonitor.srcObject = userMediaStream;
+                startVCCountdown();
+            } catch (err) {
+                alert("Gagal mengakses kamera: " + err.message);
+                switchView('vc');
+            }
+        }
+
+        function startVCCountdown() {
+            vcCountdown = 50;
+            const timerEl = document.getElementById('vc-timer');
+            timerEl.innerText = vcCountdown;
+            vcInterval = setInterval(() => {
+                vcCountdown--;
+                timerEl.innerText = vcCountdown;
+                if(vcCountdown <= 10) timerEl.classList.add('animate-pulse');
+                if(vcCountdown <= 0) { clearInterval(vcInterval); endVCSession(); }
+            }, 1000);
+        }
+
+        function endVCSession() {
+            if(vcInterval) clearInterval(vcInterval);
+            if(userMediaStream) userMediaStream.getTracks().forEach(track => track.stop());
+            if(activeAudio) { activeAudio.pause(); activeAudio = null; }
+            userMediaStream = null;
+            alert(`Sesi Video Call dengan ${activeVCMember} telah berakhir.`);
+            switchView('home');
+            document.getElementById('vc-status-msg').classList.remove('hidden');
+            document.getElementById('member-stream').classList.add('hidden');
+            document.getElementById('user-sound-view').classList.add('hidden');
+        }
+
+        function adminUploadMedia(input, type) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const userView = document.getElementById('user-media-view');
+                const adminPreview = document.getElementById('admin-monitor-member');
+                
+                if(type === 'audio') {
+                    if(activeAudio) activeAudio.pause();
+                    activeAudio = new Audio(e.target.result);
+                    activeAudio.loop = true;
+                    activeAudio.play();
+                    document.getElementById('user-sound-view').classList.remove('hidden');
+                    adminPreview.innerHTML = `
+                        <div class="text-center">
+                            <div class="text-red-500 text-3xl mb-2"><i class="fas fa-volume-up"></i></div>
+                            <p class="text-[10px] font-bold uppercase">Sound Injected</p>
+                            <p class="text-[8px] text-gray-500">${file.name}</p>
+                        </div>
+                    `;
+                    logAdmin(`Sound injected: ${file.name}`);
+                } else {
+                    userView.innerHTML = '';
+                    userView.classList.remove('hidden');
+                    let mediaElement;
+                    if(type === 'image') mediaElement = `<img src="${e.target.result}" class="max-w-full max-h-full rounded-2xl">`;
+                    else if(type === 'video') mediaElement = `<video src="${e.target.result}" autoplay loop class="max-w-full max-h-full rounded-2xl"></video>`;
+                    userView.innerHTML = mediaElement;
+                    adminPreview.innerHTML = mediaElement;
+                    logAdmin(`${type.toUpperCase()} injected.`);
+                }
+                alert('Aset berhasil di-inject ke tampilan fans!');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearAdminMedia() {
+            document.getElementById('user-media-view').innerHTML = '';
+            document.getElementById('user-media-view').classList.add('hidden');
+            document.getElementById('user-sound-view').classList.add('hidden');
+            if(activeAudio) { activeAudio.pause(); activeAudio = null; }
+            document.getElementById('admin-monitor-member').innerHTML = '<p class="text-[9px] text-gray-600 uppercase italic font-bold text-center p-4">Pratinjau media yang di-inject akan muncul di sini</p>';
+            logAdmin('Semua media & suara di-reset.');
+            alert('Semua media berhasil dihapus dari tampilan fans.');
+        }
+
+        function copyToClipboard(text) {
+            const el = document.createElement('textarea');
+            el.value = text; document.body.appendChild(el);
+            el.select(); document.execCommand('copy');
+            document.body.removeChild(el);
+            alert('Tersalin!');
+        }
+
+        window.onload = () => {
+            members = MEMBER_NAMES.map((name, i) => ({ id: i, name, status: Math.random() > 0.5 ? 'Terjadwal' : 'Soon' }));
+            renderMembers();
+            setInterval(() => {
+                const bars = document.querySelectorAll('.signal-bar');
+                bars.forEach(b => { b.style.opacity = Math.random() > 0.1 ? '1' : '0.5'; });
+            }, 800);
+        };
+
+        setInterval(() => {
+            if(timerSeconds > 0) timerSeconds--;
+            else { 
+                timerSeconds = 3000; 
+                members = members.map(m => ({ ...m, status: Math.random() > 0.5 ? 'Terjadwal' : 'Soon' })); 
+                renderMembers();
+                if(!document.getElementById('view-admin').classList.contains('hidden')) renderAdminSessionList();
+            }
+            const m = Math.floor(timerSeconds/60); const s = timerSeconds%60;
+            const el = document.getElementById('global-timer');
+            if(el) el.innerText = `${m}:${s<10?'0':''}${s}`;
+        }, 1000);
+    </script>
+</body>
+</html>
+
+```
